@@ -1,0 +1,160 @@
+// components/contact/contact-form-dialog.tsx
+
+import { useEffect, useState, useMemo } from "react";
+
+import { Contact } from "@/data/contacts-mock";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ContactForm } from "@/components/contact/contact-form";
+import {
+  getDepartmentOptionsApi,
+  getLocationOptionsApi,
+  SelectOption,
+} from "@/services/contacts-api";
+
+// Same form values type as in page.tsx
+type ContactFormValues = Omit<Contact, "id">;
+
+type ContactFormDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mode: "add" | "edit";
+  // In your app this is actually the raw API row (with contact_id, mobile_no, emp_id, desk_no ...)
+  initialValues?: any;
+  onSubmit: (values: ContactFormValues) => void;
+};
+
+export function ContactFormDialog({
+  open,
+  onOpenChange,
+  mode,
+  initialValues,
+  onSubmit,
+}: ContactFormDialogProps) {
+  const title = mode === "add" ? "Add Contact" : "Edit Contact";
+
+  const [locationOptions, setLocationOptions] = useState<SelectOption[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<SelectOption[]>([]);
+  const [loadingMasters, setLoadingMasters] = useState(false);
+
+  // ---- map API row -> form defaultValues, always strings/booleans ----
+  const defaultValues: ContactFormValues = useMemo(
+    () =>
+      initialValues
+        ? {
+            // Name
+            name: initialValues.name ?? "",
+
+            // Contact info
+            email: initialValues.email ?? "",
+            phone:
+              initialValues.phone ??
+              initialValues.mobile_no ??
+              "",
+
+            // Employee / desk
+            employeeId:
+              initialValues.employeeId ??
+              initialValues.emp_id ??
+              "",
+            deskNo:
+              initialValues.deskNo ??
+              initialValues.desk_no ??
+              "",
+
+            // Location & department (store ID as string in the form)
+            location: initialValues.location
+              ? String(initialValues.location)
+              : initialValues.location_id
+              ? String(initialValues.location_id)
+              : "",
+            department: initialValues.department
+              ? String(initialValues.department)
+              : initialValues.department_id
+              ? String(initialValues.department_id)
+              : "",
+
+            // Enable user & status
+            enableUser:
+              typeof initialValues.enableUser === "boolean"
+                ? initialValues.enableUser
+                : initialValues.user_status === 1,
+            status:
+              initialValues.status === "Inactive" ||
+              initialValues.status === 0
+                ? "Inactive"
+                : "Active",
+          }
+        : {
+            name: "",
+            email: "",
+            phone: "",
+            employeeId: "",
+            deskNo: "",
+            location: "",
+            department: "",
+            enableUser: true,
+            status: "Active",
+          },
+    [initialValues]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    const loadMasters = async () => {
+      setLoadingMasters(true);
+      try {
+        const [locs, deps] = await Promise.all([
+          getLocationOptionsApi(),
+          getDepartmentOptionsApi(),
+        ]);
+
+        if (!cancelled) {
+          setLocationOptions(locs);
+          setDepartmentOptions(deps);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingMasters(false);
+        }
+      }
+    };
+
+    loadMasters();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Manage basic details, location, department and status of the contact.
+          </DialogDescription>
+        </DialogHeader>
+
+        <ContactForm
+          defaultValues={defaultValues}
+          mode={mode}
+          onCancel={() => onOpenChange(false)}
+          onSubmit={onSubmit}
+          locationOptions={locationOptions}
+          departmentOptions={departmentOptions}
+          loadingMasters={loadingMasters}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
