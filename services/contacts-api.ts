@@ -63,7 +63,7 @@ export function mapApiContactToContact(api: ApiContact): Contact {
   };
 }
 
-// Create/update payload following main app structure
+
 export function mapFormToContactPayload(
   values: Omit<Contact, "id">
 ): any {
@@ -91,28 +91,28 @@ const mapApiMasterToOption = (m: ApiMaster): SelectOption => ({
 
 // ---------- Masters ----------
 
+
 export async function getLocationOptionsApi(): Promise<SelectOption[]> {
   const res = await axiosClient.get<ApiMaster[]>("/generic-masters", {
-    params: { moduleType: 5 },
+    params: {
+      "filter[0]": "module_id||$eq||5",
+      "filter[1]": "status||$eq||1",
+    },
   });
 
-  const allowedNames = ["Puri", "Bhubaneswar", "Pune", "Ctc", "Apple inc"];
-
-  return res.data
-    .filter((m) => m.status === 1 && m.name && allowedNames.includes(m.name))
-    .map(mapApiMasterToOption);
+  return res.data.map(mapApiMasterToOption);
 }
+
 
 export async function getDepartmentOptionsApi(): Promise<SelectOption[]> {
   const res = await axiosClient.get<ApiMaster[]>("/generic-masters", {
-    params: { moduleType: 6 },
+    params: {
+      "filter[0]": "module_id||$eq||6",
+      "filter[1]": "status||$eq||1",
+    },
   });
 
-  const allowedNames = ["IT", "Finance", "HR"];
-
-  return res.data
-    .filter((m) => m.status === 1 && m.name && allowedNames.includes(m.name))
-    .map(mapApiMasterToOption);
+  return res.data.map(mapApiMasterToOption);
 }
 
 // ---------- Contacts ----------

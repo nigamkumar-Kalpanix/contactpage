@@ -2,9 +2,9 @@
 
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
 
 import { Contact } from "@/data/contacts-mock";
 
@@ -17,14 +17,12 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { ContactDropdown } from "@/components/contact/contact-dropdown";
 import { SelectOption } from "@/services/contacts-api";
 
-
 // ---- Types ----
-
-type ContactFormValues = Omit<Contact, "id">;
+// Form no longer manages enableUser or status
+export type ContactFormValues = Omit<Contact, "id" | "enableUser" | "status">;
 
 type ContactFormProps = {
   defaultValues: ContactFormValues;
@@ -36,20 +34,41 @@ type ContactFormProps = {
   loadingMasters?: boolean;
 };
 
+// ---- Validation schema (Yup) ----
 
-// Validation schema
-const contactFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Enter a valid email"),
-  phone: z.string().min(5, "Phone is required"),
-  employeeId: z.string().min(1, "Employee ID is required"),
-  deskNo: z.string().min(1, "Desk number is required"),
-  location: z.string().min(1, "Location is required"),
-  department: z.string().min(1, "Department is required"),
-  enableUser: z.boolean(),
-  status: z.enum(["Active", "Inactive"]),
+const phoneRegex = /^[0-9]{7,15}$/; // 7–15 digits
+const empIdRegex = /^[A-Za-z0-9_-]{1,20}$/; // simple, professional ID pattern
+
+const contactFormSchema = yup.object({
+  name: yup
+    .string()
+    .trim()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must be at most 100 characters")
+    .required("Name is required"),
+  email: yup
+    .string()
+    .trim()
+    .email("Enter a valid email")
+    .required("Email is required"),
+  phone: yup
+    .string()
+    .trim()
+    .matches(phoneRegex, "Enter a valid mobile number (7–15 digits)")
+    .required("Mobile number is required"),
+  employeeId: yup
+    .string()
+    .trim()
+    .matches(empIdRegex, "Employee ID can contain letters, numbers, _ and -")
+    .required("Employee ID is required"),
+  deskNo: yup
+    .string()
+    .trim()
+    .max(10, "Desk number must be at most 10 characters")
+    .required("Desk number is required"),
+  location: yup.string().trim().required("Location is required"),
+  department: yup.string().trim().required("Department is required"),
 });
-
 
 export function ContactForm({
   defaultValues,
@@ -63,7 +82,7 @@ export function ContactForm({
   const isEdit = mode === "edit";
 
   const form = useForm<ContactFormValues>({
-    resolver: zodResolver(contactFormSchema),
+    resolver: yupResolver(contactFormSchema),
     defaultValues,
   });
 
@@ -71,7 +90,6 @@ export function ContactForm({
     onSubmit(values);
   };
 
-  // Adapt backend options (number ids) to dropdown options (string values)
   const locationDropdownOptions = locationOptions.map((opt) => ({
     label: opt.label,
     value: String(opt.value),
@@ -192,47 +210,6 @@ export function ContactForm({
             label="Department"
             options={departmentDropdownOptions}
             placeholder={departmentPlaceholder}
-          />
-        </div>
-
-        {/* Fifth row: Toggles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="enableUser"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                <div className="space-y-0.5">
-                  <FormLabel>Enable User</FormLabel>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="status"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                <div className="space-y-0.5">
-                  <FormLabel>Status</FormLabel>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value === "Active"}
-                    onCheckedChange={(val) =>
-                      field.onChange(val ? "Active" : "Inactive")
-                    }
-                  />
-                </FormControl>
-              </FormItem>
-            )}
           />
         </div>
 

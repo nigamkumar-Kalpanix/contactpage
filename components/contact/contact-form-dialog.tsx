@@ -1,8 +1,5 @@
-// components/contact/contact-form-dialog.tsx
-
 import { useEffect, useState, useMemo } from "react";
 
-import { Contact } from "@/data/contacts-mock";
 import {
   Dialog,
   DialogContent,
@@ -10,21 +7,17 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ContactForm } from "@/components/contact/contact-form";
+import { ContactForm, ContactFormValues } from "@/components/contact/contact-form";
 import {
   getDepartmentOptionsApi,
   getLocationOptionsApi,
   SelectOption,
 } from "@/services/contacts-api";
 
-// Same form values type as in page.tsx
-type ContactFormValues = Omit<Contact, "id">;
-
 type ContactFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "add" | "edit";
-  // In your app this is actually the raw API row (with contact_id, mobile_no, emp_id, desk_no ...)
   initialValues?: any;
   onSubmit: (values: ContactFormValues) => void;
 };
@@ -42,22 +35,16 @@ export function ContactFormDialog({
   const [departmentOptions, setDepartmentOptions] = useState<SelectOption[]>([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
 
-  // ---- map API row -> form defaultValues, always strings/booleans ----
   const defaultValues: ContactFormValues = useMemo(
     () =>
       initialValues
         ? {
-            // Name
             name: initialValues.name ?? "",
-
-            // Contact info
             email: initialValues.email ?? "",
             phone:
               initialValues.phone ??
               initialValues.mobile_no ??
               "",
-
-            // Employee / desk
             employeeId:
               initialValues.employeeId ??
               initialValues.emp_id ??
@@ -66,8 +53,6 @@ export function ContactFormDialog({
               initialValues.deskNo ??
               initialValues.desk_no ??
               "",
-
-            // Location & department (store ID as string in the form)
             location: initialValues.location
               ? String(initialValues.location)
               : initialValues.location_id
@@ -78,17 +63,6 @@ export function ContactFormDialog({
               : initialValues.department_id
               ? String(initialValues.department_id)
               : "",
-
-            // Enable user & status
-            enableUser:
-              typeof initialValues.enableUser === "boolean"
-                ? initialValues.enableUser
-                : initialValues.user_status === 1,
-            status:
-              initialValues.status === "Inactive" ||
-              initialValues.status === 0
-                ? "Inactive"
-                : "Active",
           }
         : {
             name: "",
@@ -98,8 +72,6 @@ export function ContactFormDialog({
             deskNo: "",
             location: "",
             department: "",
-            enableUser: true,
-            status: "Active",
           },
     [initialValues]
   );
