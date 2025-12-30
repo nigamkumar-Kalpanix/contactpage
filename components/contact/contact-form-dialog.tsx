@@ -35,46 +35,41 @@ export function ContactFormDialog({
   const [departmentOptions, setDepartmentOptions] = useState<SelectOption[]>([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
 
-  const defaultValues: ContactFormValues = useMemo(
-    () =>
-      initialValues
-        ? {
-            name: initialValues.name ?? "",
-            email: initialValues.email ?? "",
-            phone:
-              initialValues.phone ??
-              initialValues.mobile_no ??
-              "",
-            employeeId:
-              initialValues.employeeId ??
-              initialValues.emp_id ??
-              "",
-            deskNo:
-              initialValues.deskNo ??
-              initialValues.desk_no ??
-              "",
-            location: initialValues.location
-              ? String(initialValues.location)
-              : initialValues.location_id
-              ? String(initialValues.location_id)
-              : "",
-            department: initialValues.department
-              ? String(initialValues.department)
-              : initialValues.department_id
-              ? String(initialValues.department_id)
-              : "",
-          }
-        : {
-            name: "",
-            email: "",
-            phone: "",
-            employeeId: "",
-            deskNo: "",
-            location: "",
-            department: "",
-          },
-    [initialValues]
-  );
+  // In ContactFormDialog.tsx - UPDATE defaultValues
+const defaultValues: ContactFormValues = useMemo(
+  () =>
+    initialValues
+      ? {
+          name: initialValues.name ?? "",
+          email: initialValues.email ?? "",
+          phone:
+            initialValues.phone ??
+            initialValues.mobile_no ??
+            "",
+          employeeId:
+            initialValues.employeeId ??
+            initialValues.emp_id ??
+            "",
+          deskNo:
+            initialValues.deskNo ??
+            initialValues.desk_no ??
+            "",
+          // FIXED: Use IDs, fallback to old fields
+          location: String(initialValues.locationId ?? initialValues.location ?? initialValues.location_id ?? ""),
+          department: String(initialValues.departmentId ?? initialValues.department ?? initialValues.department_id ?? ""),
+        }
+      : {
+          name: "",
+          email: "",
+          phone: "",
+          employeeId: "",
+          deskNo: "",
+          location: "",
+          department: "",
+        },
+  [initialValues]
+);
+
 
   useEffect(() => {
     if (!open) return;

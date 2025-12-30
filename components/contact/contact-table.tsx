@@ -1,5 +1,6 @@
 // components/contact/contact-table.tsx
 
+import Link from "next/link";
 import { Contact } from "@/data/contacts-mock";
 import {
   Table,
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ContactToggle } from "@/components/contact/contact-toggle";
 
 type ContactTableProps = {
-  contacts: any[]; 
+  contacts: any[];
   onEdit: (contact: Contact) => void;
   onDelete: (id: string | number) => void;
   onToggleEnableRequest: (id: string | number, targetValue: boolean) => void;
@@ -90,6 +91,12 @@ export function ContactTable({
               </TableCell>
 
               <TableCell className="text-right space-x-2">
+                <Link href={`/contacts/${id}`}>
+                  <Button variant="secondary" size="sm">
+                    Preview
+                  </Button>
+                </Link>
+
                 <Button
                   variant="outline"
                   size="sm"

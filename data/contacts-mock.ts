@@ -1,5 +1,3 @@
-// data/contacts-mock.ts
-
 // Shared Contact type used across the app.
 export type ContactStatus = "Active" | "Inactive";
 
@@ -13,7 +11,10 @@ export type Contact = {
   location: string;      // location name shown in UI
   department: string;    // department name shown in UI
   enableUser: boolean;   // user_status
-  status: ContactStatus; // Active / Inactive
+  status: ContactStatus; 
+  
+    locationName?: string;
+  departmentName?: string;
 };
 
 
