@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import type { Contact } from "@/data/contacts-mock";
-import { ContactsPaginatedResponse } from "@/services/contacts-api";
+import { useContactsPagination } from "../hooks/pagination";
+import {
+  createContactApi,
+  updateContactApi,
+  deleteContactApi,
+  mapFormToContactPayload,
+} from "@/services/contacts-api";
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,28 +17,18 @@ import { ContactFormDialog } from "@/components/contact/contact-form-dialog";
 import { ContactDeleteDialog } from "@/components/contact/contact-delete-dialog";
 import { ContactEnableDialog } from "@/components/contact/contact-enable-dialog";
 import { ContactStatusDialog } from "@/components/contact/contact-status-dialog";
-
-import {
-  createContactApi,
-  updateContactApi,
-  deleteContactApi,
-  mapFormToContactPayload,
-  getContactsApi,
-} from "@/services/contacts-api";
 import { useToast } from "@/components/ui/use-toast";
 
 type ContactFormValues = Omit<Contact, "id">;
 
 export default function ContactsPage() {
-  const [contactsData, setContactsData] = useState<ContactsPaginatedResponse>({
-    data: [],
-    current_page: 1,
-    last_page: 1,
-    per_page: 10,
-    total: 0,
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    contactsData,
+    loading,
+    error,
+    fetchPage,
+    setContactsData,
+  } = useContactsPagination(1, 10);
 
   const [open, setOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<any | null>(null);
@@ -45,42 +41,10 @@ export default function ContactsPage() {
   const [enableOpen, setEnableOpen] = useState(false);
 
   const [statusTarget, setStatusTarget] = useState<any | null>(null);
-  const [statusTargetValue, setStatusTargetValue] =
-    useState<"Active" | "Inactive">("Active");
+  const [statusTargetValue, setStatusTargetValue] = useState<"Active" | "Inactive">("Active");
   const [statusOpen, setStatusOpen] = useState(false);
 
   const { toast } = useToast();
-
-  // ✅ FIXED SERVER-SIDE: Load contacts with pagination + perPage support + DEBUG
-  const loadContacts = useCallback(async (page: number = 1, perPage: number = 10) => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log("🔄 Loading page:", page, "limit:", perPage);
-      const response = await getContactsApi(page, perPage);
-      console.log("✅ API Response:", {
-        page: response.current_page,
-        per_page: response.per_page,
-        total: response.total,
-        dataLength: response.data.length,
-        last_page: response.last_page
-      });
-      setContactsData(response);
-    } catch (err) {
-      setError("Failed to load contacts");
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load contacts.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    loadContacts(1, 10); // ✅ ALWAYS start with page 1, 10 rows
-  }, [loadContacts]);
 
   const handleAddClick = () => {
     setEditingContact(null);
@@ -101,20 +65,14 @@ export default function ContactsPage() {
     setDeleteOpen(true);
   };
 
-  const handleToggleEnableRequest = (
-    id: string | number,
-    targetValue: boolean
-  ) => {
+  const handleToggleEnableRequest = (id: string | number, targetValue: boolean) => {
     const contact = findById(id);
     setEnableTarget(contact);
     setEnableTargetValue(targetValue);
     setEnableOpen(true);
   };
 
-  const handleToggleStatusRequest = (
-    id: string | number,
-    targetValue: "Active" | "Inactive"
-  ) => {
+  const handleToggleStatusRequest = (id: string | number, targetValue: "Active" | "Inactive") => {
     const contact = findById(id);
     setStatusTarget(contact);
     setStatusTargetValue(targetValue);
@@ -127,14 +85,13 @@ export default function ContactsPage() {
         const payload = mapFormToContactPayload(values);
         const id = editingContact.contact_id ?? editingContact.id;
         await updateContactApi(id, payload);
-        await loadContacts(1, contactsData.per_page); // ✅ FIXED: Always reload page 1
+        await fetchPage(1, contactsData.per_page);
         toast({
           title: "Success",
           description: "Contact updated successfully.",
         });
       } catch (err: any) {
-        const message =
-          err?.response?.data?.message ?? "Failed to update contact.";
+        const message = err?.response?.data?.message ?? "Failed to update contact.";
         toast({
           variant: "destructive",
           title: "Error",
@@ -145,14 +102,13 @@ export default function ContactsPage() {
       try {
         const payload = mapFormToContactPayload(values);
         await createContactApi(payload);
-        await loadContacts(1, contactsData.per_page); // Reset to page 1
+        await fetchPage(1, contactsData.per_page);
         toast({
           title: "Success",
           description: "Contact created successfully.",
         });
       } catch (err: any) {
-        const message =
-          err?.response?.data?.message ?? "Failed to create contact.";
+        const message = err?.response?.data?.message ?? "Failed to create contact.";
         toast({
           variant: "destructive",
           title: "Error",
@@ -170,14 +126,13 @@ export default function ContactsPage() {
       try {
         const id = deleteTarget.contact_id ?? deleteTarget.id;
         await deleteContactApi(id);
-        await loadContacts(1, contactsData.per_page); 
+        await fetchPage(1, contactsData.per_page);
         toast({
           title: "Success",
           description: "Contact deleted successfully.",
         });
       } catch (err: any) {
-        const message =
-          err?.response?.data?.message ?? "Failed to delete contact.";
+        const message = err?.response?.data?.message ?? "Failed to delete contact.";
         toast({
           variant: "destructive",
           title: "Error",
@@ -236,6 +191,8 @@ export default function ContactsPage() {
     setStatusOpen(false);
   };
 
+  const goToPage = (page: number) => fetchPage(page, contactsData.per_page);
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
@@ -254,7 +211,7 @@ export default function ContactsPage() {
         onToggleStatusRequest={handleToggleStatusRequest}
       />
 
-      {/*  CENTERED SERVER-SIDE PAGINATION*/}
+      {/* FIXED PAGINATION - ACTIVE PAGE HIGHLIGHTED */}
       {contactsData.total > 0 && (
         <div className="flex flex-col items-center gap-6 pt-8 border-t bg-muted/30 p-8 rounded-xl">
           {/* Page info - CENTERED */}
@@ -266,11 +223,10 @@ export default function ContactsPage() {
 
           {/* ALL CONTROLS */}
           <div className="flex flex-wrap items-center justify-center gap-4">
-           
             <div className="flex items-center gap-2 text-sm bg-background px-3 py-2 rounded-md border shadow-sm">
               <Select 
                 value={String(contactsData.per_page)}
-                onValueChange={(value) => loadContacts(1, Number(value))}
+                onValueChange={(value) => fetchPage(1, Number(value))}
               >
                 <SelectTrigger className="h-9 w-20">
                   <SelectValue />
@@ -284,14 +240,15 @@ export default function ContactsPage() {
               </Select>
             </div>
 
-            {/* Page number */}
+            {/* FIXED PAGE BUTTONS - DYNAMIC ACTIVE STATE */}
             <div className="flex items-center gap-1 bg-background px-4 py-2 rounded-md border shadow-sm">
-              {contactsData.current_page > 1 && contactsData.last_page > 1 && (
+              {/* First page button */}
+              {contactsData.current_page > 1 && (
                 <>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => loadContacts(1, contactsData.per_page)}
+                    onClick={() => goToPage(1)}
                     className="h-9 w-9 p-0"
                   >
                     1
@@ -301,52 +258,34 @@ export default function ContactsPage() {
                   )}
                 </>
               )}
-              
-              <Button
-                variant={contactsData.current_page === 1 ? "default" : "outline"}
-                size="sm"
-                onClick={() => loadContacts(1, contactsData.per_page)}
-                disabled={contactsData.current_page === 1}
-                className={`h-9 w-10 p-0 ${contactsData.current_page === 1 ? 'bg-primary text-primary-foreground font-medium shadow-sm' : ''}`}
-              >
-                1
-              </Button>
-              
-              {contactsData.last_page > 1 && (
-                <>
-                  {contactsData.current_page > 1 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadContacts(contactsData.current_page - 1, contactsData.per_page)}
-                      disabled={contactsData.current_page === 1}
-                      className="h-9 w-10 p-0"
-                    >
-                      {contactsData.current_page}
-                    </Button>
-                  )}
-                  
-                  {contactsData.current_page < contactsData.last_page && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadContacts(contactsData.current_page + 1, contactsData.per_page)}
-                      disabled={contactsData.current_page === contactsData.last_page}
-                      className="h-9 w-10 p-0"
-                    >
-                      {contactsData.current_page + 1}
-                    </Button>
-                  )}
-                </>
-              )}
 
+              {/* Dynamic page buttons - SHOWS CURRENT PAGE ACTIVE */}
+              {[contactsData.current_page - 1, contactsData.current_page, contactsData.current_page + 1]
+                .filter(page => page >= 1 && page <= contactsData.last_page)
+                .map((page) => (
+                  <Button
+                    key={page}
+                    variant={page === contactsData.current_page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => goToPage(page)}
+                    className={`h-9 w-10 p-0 font-medium transition-all ${
+                      page === contactsData.current_page 
+                        ? 'bg-primary text-primary-foreground shadow-md hover:shadow-lg' 
+                        : 'hover:bg-accent hover:text-foreground'
+                    }`}
+                  >
+                    {page}
+                  </Button>
+                ))}
+
+              {/* Last page button */}
               {contactsData.last_page > contactsData.current_page + 1 && (
                 <>
                   <span className="px-2 py-1 text-muted-foreground text-xs">...</span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => loadContacts(contactsData.last_page, contactsData.per_page)}
+                    onClick={() => goToPage(contactsData.last_page)}
                     className="h-9 w-9 p-0"
                   >
                     {contactsData.last_page}
@@ -360,7 +299,7 @@ export default function ContactsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => loadContacts(Math.max(1, contactsData.current_page - 1), contactsData.per_page)}
+                onClick={() => goToPage(Math.max(1, contactsData.current_page - 1))}
                 disabled={contactsData.current_page === 1}
                 className="h-9 px-3"
               >
@@ -369,7 +308,7 @@ export default function ContactsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => loadContacts(Math.min(contactsData.last_page, contactsData.current_page + 1), contactsData.per_page)}
+                onClick={() => goToPage(Math.min(contactsData.last_page, contactsData.current_page + 1))}
                 disabled={contactsData.current_page === contactsData.last_page}
                 className="h-9 px-3"
               >

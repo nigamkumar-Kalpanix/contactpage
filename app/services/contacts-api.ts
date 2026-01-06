@@ -41,9 +41,9 @@ export type ContactPayload = {
   user_status: number;
 };
 
-// ✅ SERVER-SIDE pagination response (matches API)
+// ✅ SERVER-SIDE pagination response (matches hook)
 export type ContactsPaginatedResponse = {
-  data: Contact[];  // Mapped Contact[]
+  data: Contact[];
   current_page: number;
   last_page: number;
   per_page: number;
@@ -59,10 +59,10 @@ export function mapApiContactToContact(api: ApiContact): Contact {
     phone: api.mobile_no ?? "",
     employeeId: api.emp_id ?? "",
     deskNo: api.desk_no ?? "",
-    locationId: String(api.location_id),       
-    departmentId: String(api.department_id),    
-    locationName: api.location_name ?? "",     
-    departmentName: api.department ?? "",       
+    location: String(api.location_id),
+    department: String(api.department_id),
+    locationName: api.location_name ?? "",
+    departmentName: api.department ?? "",
     enableUser: api.user_status === 1,
     status: api.status === 1 ? "Active" : "Inactive",
   };
@@ -70,21 +70,17 @@ export function mapApiContactToContact(api: ApiContact): Contact {
 
 export function mapFormToContactPayload(
   values: Omit<Contact, "id">
-): any {
+): ContactPayload {
   return {
     name: values.name,
     email: values.email,
     mobile_no: values.phone,
-    location_id: Number(values.location),     
+    emp_id: values.employeeId,
+    desk_no: values.deskNo,
+    location_id: Number(values.location),
+    department_id: Number(values.department),
     status: values.status === "Active" ? 1 : 0,
     user_status: values.enableUser ? 1 : 0,
-    other_info: {
-      company: {
-        desk_no: values.deskNo,
-        emp_id: values.employeeId,
-        department_id: Number(values.department),  
-      },
-    },
   };
 }
 
@@ -93,7 +89,7 @@ const mapApiMasterToOption = (m: ApiMaster): SelectOption => ({
   value: m.master_id,
 });
 
-// ---------- Masters ----------
+// ---------- Masters (Locations/Departments) ----------
 export async function getLocationOptionsApi(): Promise<SelectOption[]> {
   const res = await axiosClient.get<ApiMaster[]>("/generic-masters", {
     params: {
@@ -101,7 +97,6 @@ export async function getLocationOptionsApi(): Promise<SelectOption[]> {
       "filter[1]": "status||$eq||1",
     },
   });
-
   return res.data.map(mapApiMasterToOption);
 }
 
@@ -112,72 +107,69 @@ export async function getDepartmentOptionsApi(): Promise<SelectOption[]> {
       "filter[1]": "status||$eq||1",
     },
   });
-
   return res.data.map(mapApiMasterToOption);
 }
 
-// ✅ SERVER-SIDE PAGINATION 
+// ✅ MAIN FIX: Server-side pagination
 export async function getContactsApi(
   page: number = 1,
   perPage: number = 10
 ): Promise<ContactsPaginatedResponse> {
-  const res = await axiosClient.get<any>("/contact-view-company", {
-    params: {
-      page: page,
-      limit: perPage,           // API uses 'limit'
-      "sort[0]": "name,ASC",    // Same as your API call
-    },
-  });
+  try {
+    const res = await axiosClient.get<any>("/contact-view-company", {
+      params: {
+        page,
+        limit: perPage,
+        "sort[0]": "name,ASC",
+      },
+    });
 
-  const apiData = res?.data ?? {};
-  console.log("Contacts API:", { 
-    page, 
-    limit: perPage, 
-    total: apiData.total, 
-    count: apiData.count,
-    dataLength: apiData.data?.length 
-  });
+    const apiData = res?.data ?? {};
+    console.log("✅ Contacts API Response:", {
+      page,
+      limit: perPage,
+      total: apiData.total,
+      count: apiData.count,
+      dataLength: apiData.data?.length,
+      last_page: apiData.pageCount,
+    });
 
-  // Map ONLY the paginated data from API
-  const paginatedContacts = (apiData.data || []).map((apiContact: any) => 
-    mapApiContactToContact(apiContact)
-  );
+    const paginatedContacts = (apiData.data || []).map((apiContact: ApiContact) =>
+      mapApiContactToContact(apiContact)
+    );
 
-  return {
-    data: paginatedContacts,
-    current_page: apiData.page || 1,
-    last_page: apiData.pageCount || 1,
-    per_page: apiData.count || perPage,
-    total: apiData.total || 0,
-  };
+    return {
+      data: paginatedContacts,
+      current_page: apiData.page || 1,
+      last_page: apiData.pageCount || 1,
+      per_page: apiData.limit || perPage, // Use API's limit
+      total: apiData.total || 0,
+    };
+  } catch (error: any) {
+    console.error(" getContactsApi failed:", error.response?.status, error.response?.data?.message);
+    throw new Error(error.response?.data?.message || "Failed to fetch contacts");
+  }
 }
 
-export async function getContactByIdApi(
-  contactId: number | string
-): Promise<Contact | null> {
+// ✅ Detail page
+export async function getContactByIdApi(contactId: number | string): Promise<Contact | null> {
   const { data } = await getContactsApi(1, 100);
   const idStr = String(contactId);
   return data.find((c: Contact) => c.id === idStr) ?? null;
 }
 
-export async function createContactApi(
-  payload: any
-): Promise<unknown> {
+// ✅ CRUD Operations
+export async function createContactApi(payload: ContactPayload): Promise<unknown> {
   const res = await axiosClient.post("/contact-master", payload);
   return res.data;
 }
 
-export async function updateContactApi(
-  contactId: number | string,
-  payload: any
-): Promise<unknown> {
+export async function updateContactApi(contactId: number | string, payload: ContactPayload): Promise<unknown> {
   const res = await axiosClient.patch(`/contact-master/${contactId}`, payload);
   return res.data;
 }
 
-export async function deleteContactApi(
-  contactId: number | string
-): Promise<unknown> {
+export async function deleteContactApi(contactId: number | string): Promise<unknown> {
   const res = await axiosClient.delete(`/contact-master/${contactId}`);
   return res.data;
 }
